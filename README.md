@@ -7,3 +7,9 @@ npm run build
 npm install -g serve
 serve -s build
 ```
+
+## Container Build and Run
+```sh
+docker build -f Containerfile -t demoapp-frontend .
+docker run -p 8080:8080 demoapp-frontend
+```
