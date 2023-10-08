@@ -3,7 +3,6 @@ This project was forked from: [arjungautam1/fullstack-frontend](https://github.c
 
 ## Build and Run
 ```sh
-npm install react-scripts
 npm run build
 npm install -g serve
 serve -s build
