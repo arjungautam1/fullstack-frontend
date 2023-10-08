@@ -5,6 +5,7 @@ import { Link, useParams } from "react-router-dom";
 export default function Home() {
   const [users, setUsers] = useState([]);
 
+  // eslint-disable-next-line
   const { id } = useParams();
 
   useEffect(() => {
@@ -12,12 +13,12 @@ export default function Home() {
   }, []);
 
   const loadUsers = async () => {
-    const result = await axios.get("http://localhost:8080/users");
+    const result = await axios.get("http://demoapp-backend:8080/users");   // Updated by Paul Gilber
     setUsers(result.data);
   };
 
   const deleteUser = async (id) => {
-    await axios.delete(`http://localhost:8080/user/${id}`);
+    await axios.delete(`http://demoapp-backend:8080/user/${id}`);   // Updated by Paul Gilber
     loadUsers();
   };
 

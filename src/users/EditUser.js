@@ -21,16 +21,17 @@ export default function EditUser() {
 
   useEffect(() => {
     loadUser();
+    // eslint-disable-next-line
   }, []);
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    await axios.put(`http://localhost:8080/user/${id}`, user);
+    await axios.put(`http://demoapp-backend:8080/user/${id}`, user);   // Updated by Paul Gilber
     navigate("/");
   };
 
   const loadUser = async () => {
-    const result = await axios.get(`http://localhost:8080/user/${id}`);
+    const result = await axios.get(`http://demoapp-backend:8080/user/${id}`);   // Updated by Paul Gilber
     setUser(result.data);
   };
 

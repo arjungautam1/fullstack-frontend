@@ -13,10 +13,11 @@ export default function ViewUser() {
 
   useEffect(() => {
     loadUser();
+  // eslint-disable-next-line
   }, []);
 
   const loadUser = async () => {
-    const result = await axios.get(`http://localhost:8080/user/${id}`);
+    const result = await axios.get(`http://demoapp-backend:8080/user/${id}`);   // Updated by Paul Gilber
     setUser(result.data);
   };
 
