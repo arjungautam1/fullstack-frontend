@@ -1,0 +1,4 @@
+#! /bin/sh
+
+# Lint YAML Files
+yamllint .
