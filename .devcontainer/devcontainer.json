@@ -1,18 +1,41 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
 // README at: https://github.com/devcontainers/templates/tree/main/src/docker-outside-of-docker
 {
-	"name": "Docker outside of Docker",
+	"name": "Development Environment for demoapp-backend",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "mcr.microsoft.com/devcontainers/base:bullseye",
+	// "image": "mcr.microsoft.com/devcontainers/base:bullseye",
 
+	// Use Docker Compose File
+	"dockerComposeFile": "compose.yaml",
+	// Service to connect from Docker Compose File
+	"service": "devcontainer",
+	"workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}", // indicates where to mount the workspace folder. This corresponds to a sub-folder under the mount point from ../..:/workspaces:cached in the docker-compose.yml file
+
+	// Available features: https://containers.dev/features
 	"features": {
+		// Preserve shell command history: https://github.com/stuartleeks/dev-container-features
+		"ghcr.io/stuartleeks/dev-container-features/shell-history:0": {},
+		// Use host's docker: https://github.com/devcontainers/features/tree/main/src/docker-outside-of-docker
 		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
 			"version": "latest",
 			"enableNonRootDocker": "true",
 			"moby": "true"
 		},
-		"ghcr.io/devcontainers/features/node:1": {},
-		"ghcr.io/stuartleeks/dev-container-features/shell-history:0": {}
+		// Install Node.js (via nvm), yarn and pnpm: https://github.com/devcontainers/features/tree/main/src/node
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "lts"
+		},
+		// Install Homebrew: https://github.com/meaningful-ooo/devcontainer-features/tree/main/src/homebrew
+		"ghcr.io/meaningful-ooo/devcontainer-features/homebrew:2": {},
+		// Install jq, yq, gojq, xq, jaq : https://github.com/eitsupi/devcontainer-features/tree/main/src/jq-likes
+		"ghcr.io/eitsupi/devcontainer-features/jq-likes:2": {
+			"jqVersion": "latest",
+			"yqVersion": "latest"
+		},
+		// Install yamllint: https://github.com/devcontainers-contrib/features/tree/main/src/yamllint
+		"ghcr.io/devcontainers-contrib/features/yamllint:2": {},
+		// Install skopeo: https://github.com/jsburckhardt/devcontainer-features
+		"ghcr.io/jsburckhardt/devcontainer-features/skopeo:1": {}
 	},
 
 	// Use this environment variable if you need to bind mount your local source code into a new container.
@@ -24,7 +47,7 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	// "postCreateCommand": "docker --version",
+	"postCreateCommand": ".devcontainer/postCreateCommand.sh", 
 
 	// Configure tool-specific properties.
 	// "customizations": {},
@@ -32,15 +55,28 @@
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
 	"remoteUser": "vscode",
 
-	// Mounts
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-azuretools.vscode-docker",
+				"github.vscode-github-actions",
+				"cweijan.vscode-mysql-client2",
+				"hashicorp.hcl",
+				"Perkovec.emoji"
+			]
+		}
+	},
+
 	"mounts": [
+		// Mount Host NPM Cache
 		{
-			"source": "${localEnv:HOME}/.m2",
-			"target": "/home/vscode/.m2",
+			"source": "${localEnv:HOME}${localEnv:USERPROFILE}/.npm",
+			"target": "/home/vscode/.npm",
 			"type": "bind"
 		},
+		// Mount Host SSH Keys and Configs
 		{
-			"source": "${localEnv:HOME}/.ssh",
+			"source": "${localEnv:HOME}${localEnv:USERPROFILE}/.ssh",
 			"target": "/home/vscode/.ssh",
 			"type": "bind"
 		}

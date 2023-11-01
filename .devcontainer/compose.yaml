@@ -1,0 +1,74 @@
+---
+# Docker Compose Reference: https://docs.docker.com/compose/compose-file/compose-file-v3/
+# Using Docker Compose for Dev Containers: https://containers.dev/guide/dockerfile#docker-compose-dockerfile
+
+# Networks top-level element reference: https://docs.docker.com/compose/compose-file/06-networks/
+networks:
+  backend:
+  frontend:
+
+# Service top-level element reference: https://docs.docker.com/compose/compose-file/05-services/
+services:
+  devcontainer:
+    depends_on:
+      demoapp-backend:
+        condition: service_healthy
+    image: mcr.microsoft.com/devcontainers/base:bullseye
+    environment:
+      # Enable Docker BuildKit https://docs.docker.com/build/buildkit/
+      DOCKER_BUILDKIT: '1'
+      DOCKER_REGISTRY_URL: ''    # Required for Maven build
+    volumes:
+      - ../..:/workspaces:cached    # mounts the workspace folder from the local source tree into the Dev Container.
+    command: sleep infinity
+    # Red Hat runtime image already exposes port 8080, thus `expose` keyword can be omitted
+    # expose:
+    #   - "8080"
+    networks:
+      - backend    # Connect to `backend` network
+      - frontend    # Connect to `frontend` network
+  demoapp-backend:
+    depends_on:
+      mysql:
+        condition: service_healthy    # healthy status is indicated by `healthcheck` keyword
+    image: ${DEMOAPP_BACKEND_IMAGE}    # defined in .env file
+    environment:
+      # Externalized Spring Configuration: https://docs.spring.io/spring-boot/docs/1.5.6.RELEASE/reference/html/boot-features-external-config.html
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}    # defined in .env file
+    healthcheck:
+      # Check Spring Boot Actuator
+      test: curl --fail http://demoapp-backend:8080/actuator/health    # command for testing health
+      # Specifying durations: https://docs.docker.com/compose/compose-file/11-extension/#specifying-durations
+      interval: 5s    # specifies the time duration or interval in which the healthcheck process will execute
+      timeout: 1s     # defines the time duration to wait for a healthcheck
+      retries: 10     # is used to define the number of tries to implement the health check after failure
+    networks:
+      - backend    # Connect to `backend` network
+      - frontend    # Connect to `frontend` network
+    restart: always
+  mysql:    # Service name is also used as hostname when connecting from other containers
+    image: mysql:8.0    # https://hub.docker.com/_/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}    # defined in .env file
+      MYSQL_DATABASE: ${MYSQL_DATABASE}    # defined in .env file
+      MYSQL_USER: ${MYSQL_USER}    # defined in .env file
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}    # defined in .env file
+    healthcheck:
+      # Login to mysql demoapp db
+      test: mysql --host=localhost --user=root --password=$$MYSQL_ROOT_PASSWORD demoapp    # command for testing health
+      # Specifying durations: https://docs.docker.com/compose/compose-file/11-extension/#specifying-durations
+      interval: 5s    # specifies the time duration or interval in which the healthcheck process will execute
+      timeout: 1s     # defines the time duration to wait for a healthcheck
+      retries: 10     # is used to define the number of tries to implement the health check after failure
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: mysql-data
+        target: /var/lib/mysql
+    networks:
+      - backend    # Connect to `backend` network
+
+# Volumes top-level element reference: https://docs.docker.com/compose/compose-file/07-volumes/
+volumes:
+  mysql-data: {}
