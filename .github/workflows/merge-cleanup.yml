@@ -1,0 +1,78 @@
+---
+# Workflow syntax for GitHub Actions: https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions
+name: Merge Cleanup
+
+# Events: https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows
+on:
+  # Run Workflow upon pull request
+  pull_request:
+    types: [closed]
+
+  # Allow user to manually trigger Workflow execution
+  workflow_dispatch:
+
+  # Run Workflow upon pull request to specified target branch(es)
+  # pull_request_target:
+  #   types: [closed]
+  #   branches:
+  #     - main
+
+# Set Workflow-level permissions: https://docs.github.com/en/actions/using-jobs/assigning-permissions-to-jobs
+permissions: {}    # This Workflow does not require any permission
+
+# Set Workflow-level environment variables
+env:
+  PROJECT: demoapp-frontend
+
+jobs:
+  output-information:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Output Information
+        run: |
+          echo "${{ toJSON(github) }}"
+
+  # Skopeo deletes image tag by reference which is not allowed by Docker Hub
+  # docker-hub-skopeo:
+  #   runs-on: ubuntu-latest
+  #   environment: docker-hub
+  #     # Skopeo is pre-installed in GitHub hosted runners: https://github.com/actions/runner-images/blob/main/images/linux/Ubuntu2004-Readme.md#tools
+  #     - name: Skopeo Login
+  #       run: |
+  #         skopeo login ${{ vars.DOCKER_REGISTRY_URL }} \
+  #           --username ${{ secrets.DOCKER_REGISTRY_USERNAME }} \
+  #           --password ${{ secrets.DOCKER_REGISTRY_PASSWORD }} \
+  #     - name: Skopeo Delete Image
+  #       id: skopeo-delete
+  #       run: |
+  #         skopeo delete docker://${{ vars.DOCKER_REGISTRY_URL }}/${{ vars.DOCKER_REPOSITORY }}/${{ env.PROJECT }}:${{ env.VERSION }}
+
+  # Regctl allows image tag deletion which is allowed by Docker Hub
+  docker-hub-regctl:
+    runs-on: ubuntu-latest
+    environment: docker-hub
+    steps:
+      # Workaround for the absence of github.branch_name
+      # Setting an environment variable: https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-environment-variable
+      - name: Set VERSION
+        if: github.head_ref != ''
+        run: |
+          echo "VERSION=${{ github.head_ref }}" >> $GITHUB_ENV
+      - name: Set VERSION
+        if: github.head_ref == ''
+        run: |
+          echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+
+      # Install regctl: https://github.com/regclient/regclient
+      - name: Install regctl
+        run: |
+          curl -L https://github.com/regclient/regclient/releases/latest/download/regctl-linux-amd64 > regctl
+          chmod 755 regctl
+      - name: regctl login
+        run: |
+          ./regctl registry login ${{ vars.DOCKER_REGISTRY_URL }} \
+            --user ${{ secrets.DOCKER_REGISTRY_USERNAME }} \
+            --pass ${{ secrets.DOCKER_REGISTRY_PASSWORD }} \
+      - name: regctl Delete Image Tag
+        run: |
+          ./regctl tag delete ${{ vars.DOCKER_REGISTRY_URL }}/${{ vars.DOCKER_REPOSITORY }}/${{ env.PROJECT }}:${{ env.VERSION }}

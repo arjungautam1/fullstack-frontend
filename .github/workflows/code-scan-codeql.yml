@@ -1,0 +1,60 @@
+---
+# Workflow syntax for GitHub Actions: https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions
+# See CodeQL results at https://github.com/paul-gilber/demoapp-frontend/security/code-scanning/tools/CodeQL/status/
+name: Scan Code with CodeQL
+
+# Events: https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows
+on:
+  # Run workflow on push except for ignored branches and paths
+  push:
+    # Secrets aren't available for dependabot on push. https://docs.github.com/en/enterprise-cloud@latest/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/troubleshooting-the-codeql-workflow#error-403-resource-not-accessible-by-integration-when-using-dependabot
+    branches-ignore:
+      - 'dependabot/**'
+      - 'cherry-pick-*'
+    paths-ignore:
+      - '**.md'    # Ignore documentation changes
+      - '.github/**(!code-scan-codeql.yml)'    # Ignore other workflow changes
+  # Run workflow on pull request
+  pull_request:    # By default, a workflow only runs when a pull_request event's activity type is opened, synchronize, or reopened
+# Run a single job at a time: https://docs.github.com/en/actions/using-jobs/using-concurrency
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Set Workflow-level permissions: https://docs.github.com/en/actions/using-jobs/assigning-permissions-to-jobs
+permissions:
+  contents: read
+
+jobs:
+  codeql:
+    # Run job when not triggered by a merge
+    if: (github.event_name == 'push' && contains(toJSON(github.event.head_commit.message), 'Merge pull request ') == false) || (github.event_name != 'push')
+    runs-on: ubuntu-latest    # GitHub-hosted runners: https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
+    permissions:
+      actions: read    # for github/codeql-action/init to get workflow details
+      contents: read    # for actions/checkout to fetch code
+      security-events: write    # for github/codeql-action/autobuild to send a status report
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4    # https://github.com/marketplace/actions/checkout
+
+      # Initializes CodeQL scanning tools
+      # https://github.com/github/codeql-action
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2.22.5    # https://github.com/github/codeql-action
+
+      # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).
+      # If this step fails, then you should remove it and run the build manually (see below)
+      # - name: Autobuild
+      #   id: autobuild
+      #   uses: github/codeql-action/autobuild@v2.22.5
+
+      # Note: If the Autobuild fails above, remove it and uncomment the following three lines
+      #    and modify them (or add more) to build your code if your project
+      #    uses a compiled language
+      - name: Build
+        run: |
+          npm ci
+
+      - name: Run CodeQL Analysis
+        uses: github/codeql-action/analyze@v2.22.5

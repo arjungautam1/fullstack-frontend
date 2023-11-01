@@ -1,0 +1,70 @@
+---
+# Publishing Docker images: https://docs.github.com/en/actions/publishing-packages/publishing-docker-images
+# Automatically generated release notes https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes
+name: Publish Container Image
+
+# Events: https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows
+on:
+  # Trigger Workflow on push event
+  push:
+    branches:
+      - main    # When `latest` image tag is published when default branch is update
+    tags:
+      - 'v*'    # When a tag starting with `v` is created e.g. v1.0.0
+
+# Set Workflow-level environment variables
+env:
+  PROJECT: demoapp-frontend
+
+jobs:
+  push_to_registries:
+    name: Push Container image to multiple registries
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3    # https://github.com/marketplace/actions/docker-setup-build
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3    # https://github.com/marketplace/actions/docker-login
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5    # https://github.com/marketplace/actions/docker-metadata-action
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}
+          tags: |
+            # set latest tag for default branch
+            type=raw,value=latest,enable={{is_default_branch}}
+            # branch event
+            type=ref,event=branch
+            # dynamically set the branch name and tag as a prefix (short sha format)
+            type=sha,prefix={{branch}}{{tag}}-
+            # tag event
+            type=ref,event=tag
+
+      # Docker Buildx Bake supports multi-platform builds: https://docs.docker.com/build/bake/
+      - name: Docker Build and Push (Bake)
+        env:
+          BUILD_IMAGE: registry.access.redhat.com/ubi8/nodejs-18
+          RUNTIME_IMAGE: registry.access.redhat.com/ubi8/nodejs-18
+        uses: docker/bake-action@v4    # https://github.com/marketplace/actions/docker-buildx-bake
+        with:
+          files: |
+            ./docker-bake.hcl
+            ${{ steps.meta.outputs.bake-file }}
+          set: |
+            build.args.BUILD_IMAGE=${{ env.BUILD_IMAGE }}
+            build.args.RUNTIME_IMAGE=${{ env.RUNTIME_IMAGE }}
+          targets: gha-build
+          push: true

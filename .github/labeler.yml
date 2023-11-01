@@ -1,0 +1,67 @@
+---
+# actions/labeler configuration: https://github.com/marketplace/actions/labeler
+
+# Default GitHub Labels: https://docs.github.com/en/issues/using-labels-and-milestones-to-track-work/managing-labels#about-default-labels
+
+# Add `documentation` label
+documentation:
+  # to any changes of markdown files on any folder or subfolders
+  - '**/*.md'
+  # to any changes within docs folder
+  - docs/**
+
+# Add `javascript` label
+javascript:
+  # to any changes within `src` folder
+  - src/**
+  # to any changes within `public` folder
+  - public/**
+
+# Add `dependencies` label
+dependencies:
+  - package.json
+  - package-lock.json
+
+
+# Add `container` label
+container:
+  # to any changes of any Containerfile within this repository
+  - '**/Containerfile*'
+  # to any changes of any Dockerfile within this repository
+  - '**/Dockerfile*'
+  # to any chages to container-structure-test.yaml file
+  - container-structure-test.yaml
+  # to any chages to compose.yaml or compose.yml file
+  - compose.yaml
+  - compose.yml
+
+# Add `devcontainer` label
+devcontainer:
+  # to any changes within .devcontainer folder
+  - .devcontainer/**
+
+# Add `github-workflow` label
+github-workflow:
+  # to any changes within .github folder
+  - .github/**
+
+# Add `vscode-settings` label
+vscode-settings:
+  # to any changes within .vscode folder
+  - .vscode/**
+
+# Add `git-config` label
+git-config:
+  # to any changes within .git folder
+  - .git/**
+  # to any changes to .gitattributes file
+  - .gitattributes
+  # to any changes to .gitignore file
+  - .gitignore
+  # to any changes within .githooks folder
+  - .githooks/**
+
+# Add `lint` label
+lint:
+  # to any changes to files, folders and subfolders with `lint` keyword
+  - '**lint**'

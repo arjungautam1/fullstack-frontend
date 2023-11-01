@@ -1,0 +1,25 @@
+---
+name: Pull Request Labeler
+
+# Events that trigger workflows: https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows
+on:
+  pull_request:    # By default, a workflow only runs when a pull_request event's activity type is opened, synchronize, or reopened
+
+# Set Workflow-level permissions: https://docs.github.com/en/actions/using-jobs/assigning-permissions-to-jobs
+permissions:
+  contents: read
+
+jobs:
+  labeler:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4    # https://github.com/marketplace/actions/checkout
+
+      - uses: actions/labeler@v4
+        with:
+          configuration-path: ./.github/labeler.yml
+          sync-labels: true    # Whether or not to remove labels when matching files are reverted or no longer changed by the PR
+          dot: true    # Whether or not to auto-include paths starting with dot (e.g. .github)

@@ -1,0 +1,25 @@
+---
+name: Container Structure Tests
+description: |
+  Container Structure Tests provide a powerful framework to validate the structure of a container image.
+  These tests can be used to check the output of commands in an image, as well as verify metadata and contents of the filesystem.
+  See https://github.com/GoogleContainerTools/container-structure-test
+  Note: This action does not pull remote images
+inputs:
+  image:
+    description: Container Image to test
+    required: true
+  configFile:
+    description: Path to Container Structure Test Configuration File
+    required: false
+    default: default-container-structure-test.yaml
+runs:
+  using: docker
+  image: Dockerfile
+  args:
+    - container-structure-test
+    - test
+    - --image
+    - ${{ inputs.image }}
+    - --config
+    - ${{ inputs.configFile }}

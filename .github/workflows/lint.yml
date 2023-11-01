@@ -1,0 +1,39 @@
+---
+# Workflow syntax for GitHub Actions: https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions
+name: Lint Files
+
+# Events: https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows
+on:
+  # Run workflow on push except for ignored branches and paths
+  push:
+    branches-ignore:
+      - 'cherry-pick-*'
+    paths:
+      - '**.yaml'
+      - '**.yml'
+      - '**.yamllint'
+  # Run workflow on pull request
+  pull_request:    # By default, a workflow only runs when a pull_request event's activity type is opened, synchronize, or reopened
+
+  # Allow other Workflows to call this Workflow
+  workflow_call:
+
+# Run a single job at a time: https://docs.github.com/en/actions/using-jobs/using-concurrency
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Set Workflow-level permissions: https://docs.github.com/en/actions/using-jobs/assigning-permissions-to-jobs
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    # Run job when not triggered by a merge
+    if: (github.event_name == 'push' && contains(toJSON(github.event.head_commit.message), 'Merge pull request ') == false) || (github.event_name != 'push')
+    runs-on: ubuntu-latest    # GitHub-hosted runners: https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4    # https://github.com/marketplace/actions/checkout
+      - name: YAML Lint
+        run: yamllint .   # yamllint is pre-installed: https://github.com/actions/runner-images/blob/main/images/linux/Ubuntu2204-Readme.md#tools

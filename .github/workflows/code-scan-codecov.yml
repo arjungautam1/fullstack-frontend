@@ -1,0 +1,40 @@
+---
+# Workflow syntax for GitHub Actions: https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions
+name: Scan Code with CodeCov
+
+# Events: https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows
+on:
+  # Run workflow on push except for ignored branches and paths
+  push:
+    # Secrets aren't available for dependabot on push. https://docs.github.com/en/enterprise-cloud@latest/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/troubleshooting-the-codeql-workflow#error-403-resource-not-accessible-by-integration-when-using-dependabot
+    branches-ignore:
+      - 'dependabot/**'
+      - 'cherry-pick-*'
+    paths-ignore:
+      - '**.md'    # Ignore documentation changes
+      - '.github/**(!code-scan-codecov.yml)'    # Ignore other workflow changes
+  # Run workflow on pull request
+  pull_request:    # By default, a workflow only runs when a pull_request event's activity type is opened, synchronize, or reopened
+
+# Run a single job at a time: https://docs.github.com/en/actions/using-jobs/using-concurrency
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Set Workflow-level permissions: https://docs.github.com/en/actions/using-jobs/assigning-permissions-to-jobs
+permissions:
+  contents: read
+
+jobs:
+  codecov:
+    # Run job when not triggered by a merge
+    if: (github.event_name == 'push' && contains(toJSON(github.event.head_commit.message), 'Merge pull request ') == false) || (github.event_name != 'push')
+    runs-on: ubuntu-latest    # GitHub-hosted runners: https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4    # https://github.com/marketplace/actions/checkout
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v3
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

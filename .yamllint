@@ -4,6 +4,9 @@ yaml-files:
   - '*.yml'
   - '.yamllint'
 
+ignore:
+  - node_modules/
+
 rules:
   anchors: enable
   braces: enable

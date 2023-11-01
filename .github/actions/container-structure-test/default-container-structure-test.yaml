@@ -1,0 +1,15 @@
+---
+# Run command:
+# > container-structure-test test --image demoapp-frontend --config container-structure-test.yaml
+schemaVersion: 2.0.0
+
+metadataTest:
+  user: ''
+
+fileExistenceTests:
+  - name: Check Container structure test is installed
+    path: /usr/local/bin/container-structure-test
+    shouldExist: true
+    permissions: -rwxr-xr-x
+    uid: 0
+    gid: 0

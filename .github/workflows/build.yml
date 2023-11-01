@@ -1,0 +1,193 @@
+---
+# Workflow syntax for GitHub Actions: https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions
+# Build Application and Upload Container Image to Docker Hub
+name: Build and Scan Image
+
+# Events: https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows
+on:
+  # Run workflow on push except for ignored branches and paths
+  push:
+    # Secrets aren't available for dependabot on push. https://docs.github.com/en/enterprise-cloud@latest/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/troubleshooting-the-codeql-workflow#error-403-resource-not-accessible-by-integration-when-using-dependabot
+    branches-ignore:
+      # - 'dependabot/**'
+      - 'cherry-pick-*'
+    paths-ignore:
+      - '**.md'    # Ignore documentation changes
+      - '.github/**(!build.yml)'    # Ignore other workflow changes
+  # Run workflow on pull request
+  pull_request:    # By default, a workflow only runs when a pull_request event's activity type is opened, synchronize, or reopened
+  # Allow user to manually trigger Workflow execution
+  workflow_dispatch:
+
+# Set Workflow-level permissions: https://docs.github.com/en/actions/using-jobs/assigning-permissions-to-jobs
+permissions:
+  contents: read
+
+# Run a single job at a time: https://docs.github.com/en/actions/using-jobs/using-concurrency
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Set Workflow-level environment variables
+env:
+  PROJECT: demoapp-frontend
+
+jobs:
+  build:
+    # Run job when not triggered by a merge
+    if: (github.event_name == 'push' && contains(toJSON(github.event.head_commit.message), 'Merge pull request ') == false) || (github.event_name != 'push')
+    runs-on: ubuntu-latest
+    environment: docker-hub    # Use `docker-hub` repository environment
+    # Uncomment lines below to run `build` job on container
+    # Note: container image must contains commands required for step execution, e.g. docker, gzip, etc.
+    # container:
+    #   image: mcr.microsoft.com/openjdk/jdk:17-ubuntu    # Image Java version must match with `project.version` in pom.xml
+    #   # Set credentials when container registry requires authentication to pull the image
+    #   # credentials:
+    #   #   username: ${{ github.actor }}
+    #   #   password: ${{ secrets.github_token }}
+    steps:
+      # Workaround for the absence of github.branch_name
+      # Setting an environment variable: https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-environment-variable
+      - name: Set VERSION
+        if: github.head_ref != ''
+        run: |
+          echo "VERSION=${{ github.head_ref }}" >> $GITHUB_ENV
+      - name: Set VERSION
+        if: github.head_ref == ''
+        run: |
+          echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+
+      # Set Complete Container Image URL
+      - name: Set CONTAINER_IMAGE_URL
+        run: |
+          echo "CONTAINER_IMAGE_URL=${{ vars.DOCKER_REGISTRY_URL }}/${{ vars.DOCKER_REPOSITORY }}/${{ env.PROJECT }}:${{ env.VERSION }}" >> $GITHUB_ENV
+
+      - name: Checkout repository
+        uses: actions/checkout@v4    # https://github.com/marketplace/actions/checkout
+
+      # Cache NPM dependencies
+      - name: Install and Cache NPM dependencies
+        id: cache
+        uses: actions/cache@v3    # https://github.com/marketplace/actions/cache#using-a-combination-of-restore-and-save-actions
+        with:
+          path: |
+            ~/.npm
+          key: npm-${{ hashFiles('package.json','**/package-lock.json') }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3    # https://github.com/marketplace/actions/docker-setup-build
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3    # https://github.com/marketplace/actions/docker-login
+        with:
+          registry: ${{ vars.DOCKER_REGISTRY_URL }}
+          username: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+          password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+
+      - name: Docker Build and Push
+        uses: docker/build-push-action@v5    # https://github.com/marketplace/actions/build-and-push-docker-images
+        with:
+          context: .
+          file: Containerfile
+          push: true
+          tags: ${{ env.CONTAINER_IMAGE_URL }}    # CONTAINER_IMAGE_URL is defined in GITHUB_ENV
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  container-structure-test:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: docker-hub    # Use `docker-hub` repository environment
+    steps:
+      # Workaround for the absence of github.branch_name
+      # Setting an environment variable: https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-environment-variable
+      - name: Set VERSION
+        if: github.head_ref != ''
+        run: |
+          echo "VERSION=${{ github.head_ref }}" >> $GITHUB_ENV
+      - name: Set VERSION
+        if: github.head_ref == ''
+        run: |
+          echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+
+      # Set Complete Container Image URL
+      - name: Set CONTAINER_IMAGE_URL
+        run: |
+          echo "CONTAINER_IMAGE_URL=${{ vars.DOCKER_REGISTRY_URL }}/${{ vars.DOCKER_REPOSITORY }}/${{ env.PROJECT }}:${{ env.VERSION }}" >> $GITHUB_ENV
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3    # https://github.com/marketplace/actions/docker-login
+        with:
+          registry: ${{ vars.DOCKER_REGISTRY_URL }}
+          username: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+          password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+      - name: Pull Container Image
+        # CONTAINER_IMAGE_URL is defined in GITHUB_ENV
+        run: |
+          docker pull ${{ env.CONTAINER_IMAGE_URL }}
+
+      - name: Checkout repository
+        uses: actions/checkout@v4    # https://github.com/marketplace/actions/checkout
+
+      - name: Run Container Structure Test
+        uses: ./.github/actions/container-structure-test
+        with:
+          image: ${{ env.CONTAINER_IMAGE_URL }}    # CONTAINER_IMAGE_URL is defined in GITHUB_ENV
+          configFile: ./container-structure-test.yaml
+
+  scan:
+    needs: build
+    runs-on: ubuntu-latest
+    # Set Job-level permissions: https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idpermissions
+    permissions:
+      security-events: write    # Allow Job to upload scan results to GitHub
+    environment: docker-hub    # Use `docker-hub` repository environment
+    env:
+      TRIVY_CACHE_DIR: /tmp/trivy/
+    steps:
+      # Workaround for the absence of github.branch_name
+      # Setting an environment variable: https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-environment-variable
+      - name: Set VERSION
+        if: github.head_ref != ''
+        run: |
+          echo "VERSION=${{ github.head_ref }}" >> $GITHUB_ENV
+      - name: Set VERSION
+        if: github.head_ref == ''
+        run: |
+          echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+
+      # Set Complete Container Image URL
+      - name: Set CONTAINER_IMAGE_URL
+        run: |
+          echo "CONTAINER_IMAGE_URL=${{ vars.DOCKER_REGISTRY_URL }}/${{ vars.DOCKER_REPOSITORY }}/${{ env.PROJECT }}:${{ env.VERSION }}" >> $GITHUB_ENV
+
+      - name: Checkout repository
+        uses: actions/checkout@v4    # https://github.com/marketplace/actions/checkout
+
+      - name: Cache Trivy
+        id: cache
+        uses: actions/cache@v3    # https://github.com/marketplace/actions/cache#using-a-combination-of-restore-and-save-actions
+        with:
+          path: ${{ env.TRIVY_CACHE_DIR }}
+          key: trivy-${{ hashFiles('**/pom.xml', '**/Containerfile*') }}    # Trivy scan results are influenced by npm dependencies and Containerfile runtime image
+
+      - name: Scan Image with Aqua Security Trivy
+        uses: aquasecurity/trivy-action@0.13.0    # https://github.com/marketplace/actions/aqua-security-trivy
+        with:
+          image-ref: ${{ env.CONTAINER_IMAGE_URL }}    # CONTAINER_IMAGE_URL is defined in GITHUB_ENV
+          vuln-type: 'os,library'
+          severity: 'LOW,MEDIUM,HIGH,CRITICAL'
+          scanners: 'vuln,secret,config'
+          ignore-unfixed: true
+          exit-code: '1'
+          cache-dir: ${{ env.TRIVY_CACHE_DIR }}
+          format: sarif
+          output: 'trivy-results.sarif'
+        env:
+          TRIVY_USERNAME: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+          TRIVY_PASSWORD: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2.22.5    # https://github.com/github/codeql-action/tree/main/upload-sarif
+        with:
+          sarif_file: 'trivy-results.sarif'
